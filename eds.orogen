@@ -1,0 +1,148 @@
+# 
+# This file is part of the EDS: Event-aided Direct Sparse Odometry
+# (https://rpg.ifi.uzh.ch/eds.html)
+#
+# Copyright (c) 2022 Javier Hidalgo-Carrio, Robotics and Perception
+# Group (RPG) University of Zurich.
+#
+# EDS is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# EDS is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+name "eds"
+# Optionally declare the version number
+# version "0.1"
+
+# If new data types need to be defined, they have to be put in a separate C++
+# header, and this header will be loaded here
+import_types_from "edsTypes.hpp"
+# Finally, it is pretty common that headers are directly loaded from an external
+# library. In this case, the library must be first used (the name is the
+# library's pkg-config name) and then the header can be used. Following Rock
+# conventions, a common use-case would be:
+using_library "eds" # Event-aided Direct Sparse Odometry
+using_library "yaml-cpp" # yaml
+using_library "frame_helper" # Image Frames
+
+# If this project uses data types that are defined in other oroGen projects,
+# these projects should be imported there as well.
+import_types_from "std"
+import_types_from "base"
+
+# Declare a new task context (i.e., a component)
+#
+# The corresponding C++ class can be edited in tasks/Task.hpp and
+# tasks/Task.cpp, and will be put in the eds namespace.
+task_context "Task" do
+    # This is the default from now on, and should not be removed. Rock will
+    # transition to a setup where all components use a configuration step.
+    needs_configuration
+
+    #*************************
+    #****Task Properties *****
+    #*************************
+    property "config_file", "std::string"
+        doc "Yaml file for EDS configuration"
+
+    property "calib_file", "std::string"
+        doc "Camera calibration file"
+
+    property "frame_interrupt", "bool"
+        doc "Interrupt frames by user input (reconfigure). FALSE by default"
+
+    #*****************************
+    #******* Input Ports *********
+    #*****************************
+    input_port('events', 'base::samples::EventArray').
+        doc 'array of events'
+
+    input_port('frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'RGB Image frame'
+
+    input_port('imu', 'base::samples::IMUSensors').
+        doc 'Inertial measurements'
+
+    input_port('depthmap', ro_ptr('base::samples::DistanceImage')).
+    #input_port('depthmap', ro_ptr('base::samples::frame::Frame')).
+        doc 'Depth map (optional for debug)'
+
+    input_port('groundtruth', 'base::samples::RigidBodyState').
+        doc 'Ground truth camera pose w.r.t world (optional for debug)'
+
+
+    #************************
+    # aggregator parameters
+    #************************
+    stream_aligner do
+        align_port('events', 0)
+        align_port('frame', 0)
+        align_port('imu', 0)
+        align_port('groundtruth', 0)
+        max_latency(0.05)
+    end
+
+    #******************************
+    #******* Output Ports *********
+    #******************************
+
+    ####### Frames #########
+    output_port('event_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Events image frame'
+
+    output_port('residuals_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Residuals image frame'
+
+    output_port('of_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Optical flow frame'
+
+    output_port('model_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Bightness Model Image'
+
+    output_port('inv_depth_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Inverse depth frame'
+
+    output_port('keyframes_frame', ro_ptr('base::samples::frame::Frame')).
+        doc 'Mosaic of all Keyframes with the inverse depth of active points'
+
+    ####### Poses #########
+    output_port('pose_w_kfs', 'eds::VectorKFs').
+        doc 'Sliding window of keyframe poses w.r.t world (T_w_kf[i])'
+
+    output_port('pose_w_ef', '/base/samples/RigidBodyState').
+        doc 'Camera egomotion eventframe w.r.t world (T_w_ef)'
+
+    ####### Maps #########
+    output_port('local_map', '/base/samples/Pointcloud').
+        doc 'Local map in the current key frame'
+
+    output_port('global_map', '/base/samples/Pointcloud').
+        doc 'Global map in the world frame'
+
+    ####### Maps #########
+    output_port('model_frame_vector', 'eds::ModelFrameVector').
+        doc 'Model in vector form (with timestamp)'
+
+    output_port('event_frame_vector', 'eds::EventFrameVector').
+        doc 'Event frame in vector form (with timestamp)'
+
+    ####### Infos #########
+    output_port('tracker_info', 'eds::TrackerInfo').
+        doc 'Tracker information'
+
+    output_port('bundles_info', 'eds::PBAInfo').
+        doc 'Bundle Adjustement information'
+
+    runtime_states :INITIALIZING, :OPTIMIZING, :LOGGING
+
+    port_driven
+
+end
+

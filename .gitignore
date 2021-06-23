@@ -1,0 +1,10 @@
+templates/*
+.orogen/*
+*~
+.*.swp
+build/*
+__pycache__
+
+*autobuild-stamp
+.vscode
+
